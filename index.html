@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>Evaluación Programación I</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;700;900&family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* HUD de videojuego: barra de XP fija arriba, dos "mundos" (teoría / práctica) con niveles en tarjetas de borde neón que fluye */
+:root{
+  --bg:#08040c; --panel:#130a1b; --panel-2:#1b0f26; --line:#35203f;
+  --fg:#f7ecff; --muted:#b39cc4;
+  --pink:#ff2bd6; --violet:#9b5cff; --cyan:#28f0ff; --lime:#b8ff3c;
+  --bad:#ff4f78;
+  --f-display:"Tektur","Chakra Petch",system-ui,sans-serif;
+  --f-body:"Chakra Petch",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --neon:linear-gradient(115deg,var(--pink),var(--violet),var(--cyan),var(--lime),var(--pink));
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.55;margin:0}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(to bottom,rgba(255,255,255,.025) 0 1px,transparent 1px 3px)}
+body::after{content:"";position:fixed;inset:-20%;pointer-events:none;z-index:-1;
+  background:radial-gradient(40% 30% at 15% 10%,rgba(255,43,214,.16),transparent 70%),
+             radial-gradient(35% 30% at 85% 30%,rgba(40,240,255,.10),transparent 70%),
+             radial-gradient(40% 35% at 50% 95%,rgba(155,92,255,.14),transparent 70%);
+  animation:drift 18s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate3d(3%,-4%,0) rotate(4deg)}}
+
+.wrap{max-width:920px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+
+/* HUD */
+.hud{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:rgba(8,4,12,.88);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line)}
+.hud-in{max-width:920px;margin:0 auto;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.hud-label{font-family:var(--f-display);font-size:12px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.xp{flex:1 1 200px;min-width:0;height:12px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.xp span{display:block;height:100%;width:0;background:var(--neon);background-size:300% 100%;
+  animation:flow 4s linear infinite;box-shadow:0 0 12px var(--pink);transition:width .5s cubic-bezier(.2,.9,.3,1.2)}
+.hud-num{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--cyan)}
+@keyframes flow{to{background-position:300% 0}}
+
+/* Portada */
+.hero{padding-block:36px 20px;display:grid;gap:18px}
+.eyebrow{font-family:var(--f-display);letter-spacing:.3em;font-size:12px;color:var(--cyan);text-transform:uppercase}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(1.5rem,4.2vw,2.3rem);line-height:1.15;margin:0;text-wrap:balance;
+  background:var(--neon);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:flow 7s linear infinite;filter:drop-shadow(0 0 18px rgba(255,43,214,.45))}
+.hero p{margin:0;color:var(--muted);max-width:62ch}
+.player{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.field{display:grid;gap:6px;min-width:0}
+.field label{font-family:var(--f-display);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+input[type=text],select,textarea{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+input[type=text]:focus,select:focus,textarea:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 3px rgba(255,43,214,.25),0 0 18px rgba(255,43,214,.3)}
+.rules{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}
+.chip b{color:var(--lime);font-weight:600}
+
+/* Mundos y niveles */
+.world{margin-top:40px;display:grid;gap:18px}
+.world-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px dashed var(--line);padding-bottom:10px}
+.world-head h2{font-family:var(--f-display);font-size:clamp(1.4rem,4vw,2rem);margin:0;letter-spacing:.04em}
+.world-head h2 em{font-style:normal;color:var(--pink);text-shadow:0 0 14px var(--pink)}
+.world-head .pts{font-family:var(--f-mono);color:var(--lime);font-size:14px}
+.level{border:1.5px solid transparent;border-radius:14px;padding:20px;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--neon) border-box;
+  background-size:100% 100%,300% 300%;animation:border 8s linear infinite;display:grid;gap:14px;min-width:0}
+@keyframes border{to{background-position:0 0,300% 0}}
+.lv-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.lv-badge{font-family:var(--f-display);font-weight:700;font-size:12px;letter-spacing:.14em;padding:5px 10px;border-radius:6px;
+  background:var(--pink);color:#12001a;box-shadow:0 0 16px rgba(255,43,214,.6)}
+.lv-top h3{font-family:var(--f-display);font-size:1.25rem;margin:0;flex:1;min-width:0;text-wrap:balance}
+.lv-pts{font-family:var(--f-mono);font-size:13px;color:var(--cyan)}
+.hint{color:var(--muted);margin:0;font-size:15px}
+.sub{font-family:var(--f-display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin:6px 0 0}
+
+/* V/F */
+.vf{display:grid;gap:10px}
+.vf-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+.vf-row p{margin:0;min-width:0}
+.vf-btns{display:flex;gap:6px}
+.opt{font-family:var(--f-display);font-weight:700;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);
+  border-radius:8px;padding:8px 12px;min-width:44px;transition:transform .15s,box-shadow .2s,background .2s}
+.opt:hover{border-color:var(--pink);transform:translateY(-1px)}
+.opt:focus-visible,.btn:focus-visible,.mv:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.opt.on{background:var(--pink);color:#12001a;border-color:var(--pink);box-shadow:0 0 14px var(--pink);animation:pop .25s}
+@keyframes pop{50%{transform:scale(1.12)}}
+
+/* Unir */
+.legend{display:grid;gap:6px;margin:0;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);list-style:none}
+.legend li{display:flex;gap:10px}
+.legend b{font-family:var(--f-mono);color:var(--cyan)}
+.match{display:grid;gap:8px}
+.match-row{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center}
+.kw{font-family:var(--f-mono);font-weight:600;color:var(--lime);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center}
+
+/* Clasificar */
+.cls{display:grid;gap:8px}
+.cls-row{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center}
+.val{font-family:var(--f-mono);font-size:15px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;color:var(--cyan)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg .opt{font-family:var(--f-mono);font-weight:600;font-size:13px}
+
+/* Código */
+pre,code{font-family:var(--f-mono)}
+.codebox{background:#050208;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-size:14px;line-height:1.9;margin:0}
+.codebox select.blank{display:inline-block;width:auto;font-family:var(--f-mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px dashed var(--pink);background:#1a0620;color:var(--pink)}
+.cm{color:#7d6a8c}
+.kwc{color:var(--pink)}
+.str{color:var(--lime)}
+
+/* Ordenar */
+.order{display:grid;gap:6px;list-style:none;margin:0;padding:0}
+.order li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;background:#050208;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0;transition:transform .2s}
+.order li .n{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.order li code{font-size:13.5px;white-space:pre;overflow-x:auto;min-width:0;color:var(--fg)}
+.order .mv{cursor:pointer;background:var(--panel-2);color:var(--cyan);border:1px solid var(--line);border-radius:6px;width:34px;height:30px;font-weight:700}
+.order .mv:hover{border-color:var(--cyan)}
+.order li.flash{animation:flash .35s}
+@keyframes flash{50%{box-shadow:0 0 14px var(--cyan);border-color:var(--cyan)}}
+
+/* Práctica */
+.story{margin:0;padding:12px 14px;border-left:3px solid var(--cyan);background:var(--panel-2);border-radius:0 10px 10px 0}
+.task{margin:0;padding-left:22px;display:grid;gap:4px}
+.task li::marker{color:var(--pink);font-family:var(--f-mono)}
+details.syntax{border:1px solid var(--line);border-radius:10px;background:#050208}
+details.syntax summary{cursor:pointer;padding:10px 14px;font-family:var(--f-display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+details.syntax pre{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 10px 10px}
+.code-in{font-family:var(--f-mono);font-size:13.5px;line-height:1.55;min-height:230px;resize:vertical;tab-size:4;white-space:pre;overflow-x:auto}
+.out-in{font-family:var(--f-mono);font-size:13px;min-height:70px;resize:vertical}
+.checks{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.checks li{font-family:var(--f-mono);font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted);transition:all .25s}
+.checks li.yes{color:#0d1a00;background:var(--lime);border-color:var(--lime);box-shadow:0 0 10px rgba(184,255,60,.5)}
+.extra{font-size:14px;color:var(--muted);margin:0}
+.extra b{color:var(--lime)}
+
+/* Cierre */
+.final{margin-top:40px;display:grid;gap:14px}
+.btn{font-family:var(--f-display);font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:0;border-radius:12px;
+  padding:16px 24px;font-size:1.1rem;color:#12001a;background:var(--neon);background-size:300% 100%;
+  animation:flow 5s linear infinite,glow 2.2s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 28px rgba(255,43,214,.75),0 0 60px rgba(40,240,255,.25)}}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);animation:none;font-size:.9rem;padding:12px 18px}
+.btn.ghost:hover{border-color:var(--pink)}
+.btn:disabled{opacity:.45;cursor:not-allowed;animation:none}
+
+/* Corrección */
+.locked .opt,.locked select,.locked textarea,.locked input,.locked .mv{pointer-events:none}
+.ok{outline:2px solid var(--lime);outline-offset:1px}
+.bad{outline:2px solid var(--bad);outline-offset:1px}
+.fix{font-family:var(--f-mono);font-size:12px;color:var(--bad);display:block;margin-top:4px}
+
+/* Modal */
+.modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(5,2,8,.82);backdrop-filter:blur(6px)}
+.card{width:min(560px,100%);max-height:90vh;overflow:auto;background:var(--panel);border-radius:16px;padding:24px;display:grid;gap:14px;
+  border:1.5px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--neon) border-box;background-size:100% 100%,300% 300%;animation:border 6s linear infinite}
+.card h2{font-family:var(--f-display);margin:0;font-size:1.6rem}
+.card p{margin:0;color:var(--muted)}
+.row-btns{display:flex;gap:10px;flex-wrap:wrap}
+.score{font-family:var(--f-display);font-weight:900;font-size:clamp(3rem,14vw,5rem);line-height:1;color:var(--lime);text-shadow:0 0 24px rgba(184,255,60,.6);font-variant-numeric:tabular-nums}
+.score small{font-size:.35em;color:var(--muted);text-shadow:none}
+.breakdown{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-family:var(--f-mono);font-size:14px}
+.breakdown li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:4px}
+.reset-box{display:grid;gap:10px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:70;background:var(--panel-2);border:1px solid var(--pink);
+  padding:10px 16px;border-radius:10px;font-family:var(--f-mono);font-size:13px;box-shadow:0 0 18px rgba(255,43,214,.4)}
+
+footer{margin-top:48px;padding-block:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font-family:var(--f-display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+footer b{color:var(--pink)}
+
+@media (max-width:560px){
+  .player{grid-template-columns:1fr}
+  .vf-row{grid-template-columns:1fr}
+  .match-row,.cls-row{grid-template-columns:1fr}
+  .level{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+<div class="hud" role="region" aria-label="Progreso">
+  <div class="hud-in">
+    <span class="hud-label">XP</span>
+    <div class="xp" aria-hidden="true"><span id="xpbar"></span></div>
+    <span class="hud-num" id="xpnum">0/27</span>
+    <span class="hud-label">Tiempo</span>
+    <span class="hud-num" id="clock">00:00</span>
+  </div>
+</div>
+
+<main class="wrap" id="app">
+  <header class="hero">
+    <span class="eyebrow">Programación I · Evaluación</span>
+    <h1>Evaluación II · Variables, if, while, arrays y for</h1>
+    <p>Dos mundos, seis niveles. El mundo de teoría se corrige solo; el de práctica lo corrige el profe a partir del código que pegues. Al final apretás <strong>Descargar resultados</strong>, se genera tu reporte en PDF y lo subís a CREA.</p>
+    <div class="player">
+      <div class="field"><label for="nombre">Nombre y apellido</label><input type="text" id="nombre" autocomplete="name" placeholder="Ej.: Valentina Pereira"></div>
+      <div class="field"><label for="grupo">Grupo</label><input type="text" id="grupo" placeholder="Ej.: 5°2"></div>
+    </div>
+    <div class="rules">
+      <span class="chip">Teoría <b>5 pts</b></span>
+      <span class="chip">Práctica <b>5 pts</b></span>
+      <span class="chip">Total <b>10 pts</b></span>
+      <span class="chip">Lenguaje <b>Java</b></span>
+      <span class="chip">Se guarda solo en este navegador</span>
+    </div>
+  </header>
+
+  <!-- MUNDO 1 -->
+  <section class="world" id="w1">
+    <div class="world-head"><h2>Mundo 1 · <em>Teoría</em></h2><span class="pts">5 pts · corrección automática</span></div>
+
+    <article class="level" id="lv1">
+      <div class="lv-top"><span class="lv-badge">NIVEL 1</span><h3>Verdadero o falso</h3><span class="lv-pts">1,5 pts</span></div>
+      <p class="hint">Marcá <b>V</b> si la afirmación es verdadera o <b>F</b> si es falsa.</p>
+      <div class="vf" id="vf"></div>
+    </article>
+
+    <article class="level" id="lv2">
+      <div class="lv-top"><span class="lv-badge">NIVEL 2</span><h3>Uní y clasificá</h3><span class="lv-pts">1,5 pts</span></div>
+      <p class="sub">A · Uní cada estructura con lo que hace</p>
+      <p class="hint">Hay una descripción de más que no corresponde a ninguna.</p>
+      <ul class="legend" id="legend"></ul>
+      <div class="match" id="match"></div>
+      <p class="sub">B · Clasificá cada valor según su tipo de dato</p>
+      <p class="hint">Fijate bien en las comillas y en los puntos.</p>
+      <div class="cls" id="cls"></div>
+    </article>
+
+    <article class="level" id="lv3">
+      <div class="lv-top"><span class="lv-badge">NIVEL 3</span><h3>Completá y ordená el código</h3><span class="lv-pts">2 pts</span></div>
+      <p class="sub">A · Completá los espacios</p>
+      <p class="hint">El programa tiene que mostrar las vidas que quedan hasta llegar a cero y después listar todo lo que hay en la mochila.</p>
+      <pre class="codebox" id="comp"></pre>
+      <p class="sub">B · Ordená las líneas</p>
+      <p class="hint">Usá las flechas para que el programa muestre <code>3... 2... 1... ¡GO!</code> en ese orden.</p>
+      <ol class="order" id="order"></ol>
+    </article>
+  </section>
+
+  <!-- MUNDO 2 -->
+  <section class="world" id="w2">
+    <div class="world-head"><h2>Mundo 2 · <em>Práctica</em></h2><span class="pts">5 pts · corrige el profe</span></div>
+    <p class="hint">Resolvé cada ejercicio en <b>GDB online</b> (elegí el lenguaje Java) u otro compilador. Cuando funcione, copiá el código completo, con <code>public class Main</code>, y pegalo en su espacio. Si querés, pegá también lo que mostró la consola.</p>
+    <div id="practice" style="display:grid;gap:18px"></div>
+  </section>
+
+  <!-- CIERRE -->
+  <section class="final">
+    <div class="world-head"><h2>Antes de <em>terminar</em></h2><span class="pts">no suma puntos</span></div>
+    <div class="player">
+      <div class="field"><label for="dificil">¿Qué nivel te costó más?</label>
+        <select id="dificil"><option value="">Elegí uno…</option><option>Nivel 1 · Verdadero o falso</option><option>Nivel 2 · Uní y clasificá</option><option>Nivel 3 · Completá y ordená</option><option>Nivel 4 · Torneo de FIFA en la UTU</option><option>Nivel 5 · Clave del wifi</option><option>Nivel 6 · Menú semanal del comedor</option></select></div>
+      <div class="field"><label for="animo">¿Cómo te fue?</label>
+        <select id="animo"><option value="">Elegí…</option><option>Muy bien</option><option>Bien</option><option>Más o menos</option><option>Me costó mucho</option></select></div>
+    </div>
+    <div class="field"><label for="comentario">Comentario para el profe (opcional)</label><textarea id="comentario" rows="3" placeholder="Algo que quieras aclarar sobre tus ejercicios"></textarea></div>
+    <button class="btn" id="send" type="button">Descargar resultados</button>
+  </section>
+
+  <footer><span>Prof. <b>Bruno Silva</b></span><span>Programación I</span></footer>
+</main>
+
+<div class="modal" id="confirm" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="c-title">
+    <h2 id="c-title">¿Terminar y descargar resultados?</h2>
+    <p id="c-msg"></p>
+    <div class="row-btns"><button class="btn" id="c-yes" type="button">Sí, descargar</button><button class="btn ghost" id="c-no" type="button">Seguir revisando</button></div>
+  </div>
+</div>
+
+<div class="modal" id="result" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="r-title">
+    <h2 id="r-title">Evaluación terminada</h2>
+    <p>Teoría (corrección automática)</p>
+    <div class="score"><span id="r-score">0</span><small> / 5</small></div>
+    <ul class="breakdown" id="r-break"></ul>
+    <p>La práctica (5 pts) la corrige el profe con el código que pegaste. Descargá el PDF y subilo a la tarea de CREA.</p>
+    <div class="row-btns"><button class="btn" id="r-pdf" type="button">Descargar PDF</button><button class="btn ghost" id="r-close" type="button">Ver mis respuestas</button></div>
+    <button class="btn ghost" id="r-reset" type="button">Nueva evaluación (otro estudiante)</button>
+    <div id="reset-confirm" class="reset-box" hidden>
+      <p>Esto borra todas las respuestas de esta computadora. ¿Seguro?</p>
+      <div class="row-btns"><button class="btn ghost" id="rs-yes" type="button">Sí, borrar todo</button><button class="btn ghost" id="rs-no" type="button">Cancelar</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>(Math.round(n*100)/100).toFixed(2).replace(".",",");
+
+/* ---------- CONTENIDO ---------- */
+const VF=[
+ {t:"En Java, una variable declarada como int puede guardar el valor 3.5 sin problema.",a:false,why:"int solo guarda enteros; 3.5 va en un double."},
+ {t:"La condición (a && b) es verdadera solo si a y b son verdaderas al mismo tiempo.",a:true},
+ {t:"Un while puede no ejecutarse nunca si su condición ya es falsa desde el principio.",a:true},
+ {t:"En un array de 5 elementos, el último está en la posición 5.",a:false,why:"Las posiciones van de 0 a 4."},
+ {t:"El operador == se usa para asignarle un valor a una variable.",a:false,why:"== compara; = asigna."},
+ {t:"El for es ideal cuando sabemos de antemano cuántas veces se tiene que repetir algo.",a:true}
+];
+const LEG=[
+ {k:"A",d:"Repite un bloque mientras una condición sea verdadera."},
+ {k:"B",d:"Guarda varios valores del mismo tipo bajo un solo nombre."},
+ {k:"C",d:"Ejecuta un bloque u otro según si una condición se cumple."},
+ {k:"D",d:"Repite un bloque una cantidad conocida de veces usando un contador."},
+ {k:"E",d:"Muestra un texto en la consola."}
+];
+const MATCH=[{w:"if / else",a:"C"},{w:"while",a:"A"},{w:"for",a:"D"},{w:"array",a:"B"}];
+const CATS=["int","double","String","boolean"];
+const CLS=[
+ {v:"17",a:"int"},{v:'"Bella Unión"',a:"String"},{v:"true",a:"boolean"},{v:"9.5",a:"double"},
+ {v:'"25"',a:"String"},{v:"-3",a:"int"},{v:"false",a:"boolean"},{v:"0.75",a:"double"}
+];
+const BLANKS=[
+ {o:["if","while","for"],a:"while"},
+ {o:["<",">","=="],a:">"},
+ {o:["++","--","= 0"],a:"--"},
+ {o:["length","size()","total"],a:"length"},
+ {o:["0","i","3"],a:"i"}
+];
+const COMP_TPL=
+`<span class="kwc">int</span> vidas = 3;
+[[0]] (vidas [[1]] 0) {
+    System.out.println(<span class="str">"Te quedan "</span> + vidas + <span class="str">" vidas"</span>);
+    vidas[[2]];
+}
+System.out.println(<span class="str">"GAME OVER"</span>);
+
+String[] mochila = {<span class="str">"espada"</span>, <span class="str">"poción"</span>, <span class="str">"mapa"</span>};
+<span class="kwc">for</span> (<span class="kwc">int</span> i = 0; i &lt; mochila.[[3]]; i++) {
+    System.out.println(mochila[ [[4]] ]);
+}`;
+const ORD=[
+ 'int contador = 3;',
+ 'while (contador > 0) {',
+ '    System.out.println(contador + "...");',
+ '    contador--;',
+ '}',
+ 'System.out.println("¡GO!");'
+];
+const ORD_START=[3,5,0,4,1,2];
+
+const PRACT=[
+ {id:"p1",lv:"NIVEL 4",title:"Torneo de FIFA en la UTU",pts:1.5,
+  story:"La UTU organiza un torneo de FIFA en el recreo largo. Las reglas para anotarse son: puede jugar quien <b>es estudiante de la UTU</b>, <b>trajo la autorización firmada</b> y <b>tiene 15 años o más</b>. Además, puede jugar cualquiera que haya sido <b>invitado por un profe</b>, sin importar lo demás.",
+  task:["Declará las variables <code>nombre</code> (String), <code>edad</code> (int), <code>esEstudiante</code>, <code>tieneAutorizacion</code> e <code>invitadoPorProfe</code> (boolean). Dales los valores que quieras.",
+        "Con un <code>if / else</code> que use <code>&&</code> y <code>||</code>, mostrá <code>¡Bienvenido/a al torneo, [nombre]!</code> o <code>[nombre], todavía no podés anotarte.</code>",
+        "Probá cambiando los valores hasta ver los dos mensajes."],
+  extra:"",
+  syntax:
+`<span class="cm">// Declarar variables:  tipo nombre = valor;</span>
+<span class="kwc">int</span> edad = 16;
+<span class="kwc">boolean</span> llueve = <span class="kwc">false</span>;
+String texto = <span class="str">"hola"</span>;
+
+<span class="cm">// if / else</span>
+<span class="kwc">if</span> (condición) {
+    <span class="cm">// se ejecuta si la condición es verdadera</span>
+} <span class="kwc">else</span> {
+    <span class="cm">// se ejecuta si es falsa</span>
+}
+
+<span class="cm">// Operadores lógicos</span>
+<span class="cm">// &&  significa "y": se tienen que cumplir las dos</span>
+<span class="cm">// ||  significa "o": alcanza con que se cumpla una</span>
+<span class="kwc">if</span> ((condición1 && condición2) || condición3) { ... }
+
+<span class="cm">// Mostrar texto junto con una variable</span>
+System.out.println(<span class="str">"Hola, "</span> + nombre + <span class="str">"!"</span>);`,
+  checks:[["Variable String",/\bString\s+\w+\s*=/],["Variable int",/\bint\s+\w+\s*=/],["Variables boolean",/\bboolean\s+\w+/],["if",/\bif\s*\(/],["else",/\belse\b/],["&&",/&&/],["||",/\|\|/],["println",/System\.out\.print/]]},
+ {id:"p2",lv:"NIVEL 5",title:"La clave del wifi del laboratorio",pts:1.5,
+  story:"El router del laboratorio tiene la clave <code>robot2026</code>. Tenés que programar la pantalla de acceso: el programa le pide la clave al usuario y no lo deja pasar hasta que la escriba bien.",
+  task:["Pedí la clave con <code>Scanner</code>.",
+        "Con un <code>while</code>: mientras la clave no sea la correcta, mostrá <code>Clave incorrecta, probá de nuevo</code> y volvé a pedirla.",
+        "Contá los intentos. Cuando acierte, mostrá <code>¡Conectado!</code> y cuántos intentos usó."],
+  extra:"<b>Desafío extra (opcional):</b> que después de 3 intentos fallidos muestre <code>Acceso bloqueado</code> y termine.",
+  syntax:
+`<span class="kwc">import</span> java.util.Scanner;   <span class="cm">// va arriba de todo, antes de la clase</span>
+
+Scanner teclado = <span class="kwc">new</span> Scanner(System.in);
+String dato = teclado.nextLine();    <span class="cm">// lee un texto</span>
+<span class="kwc">int</span> numero = teclado.nextInt();      <span class="cm">// lee un número entero</span>
+
+<span class="cm">// while</span>
+<span class="kwc">while</span> (condición) {
+    <span class="cm">// se repite mientras la condición sea verdadera</span>
+    <span class="cm">// ¡algo adentro tiene que cambiar para que la condición deje de cumplirse!</span>
+}
+
+<span class="cm">// Comparar textos (en Java los String se comparan con equals)</span>
+texto.equals(<span class="str">"algo"</span>)     <span class="cm">// true si son iguales</span>
+!texto.equals(<span class="str">"algo"</span>)    <span class="cm">// true si son distintos</span>
+
+<span class="cm">// Contador</span>
+<span class="kwc">int</span> contador = 0;
+contador++;   <span class="cm">// suma 1</span>`,
+  checks:[["Scanner",/Scanner/],["while",/\bwhile\s*\(/],["equals",/\.equals\s*\(/],["Contador ++",/\+\+|\+=\s*1/],["println",/System\.out\.print/]]},
+ {id:"p3",lv:"NIVEL 6",title:"Menú semanal del comedor",pts:2,
+  story:"El comedor de la UTU quiere mostrar el menú de la semana en una pantalla a la entrada. Te piden el programa: los días y las comidas se guardan en dos arrays, y la posición conecta cada día con su comida (el día en la posición 0 va con la comida en la posición 0).",
+  task:["Creá un array <code>dias</code> con los días de lunes a viernes y otro array <code>menu</code> con 5 comidas (las que quieras).",
+        "Con un <code>for</code>, mostrá cada día con su comida: <code>Lunes: milanesa con puré</code>, <code>Martes: ...</code>, y así.",
+        "Al final mostrá <code>El viernes se come: ...</code> usando <code>.length</code> para llegar al último elemento."],
+  extra:"<b>Desafío extra (opcional):</b> pedile al usuario una comida y decile qué día se sirve, o <code>Esa comida no está en el menú esta semana</code>.",
+  syntax:
+`<span class="cm">// Crear un array con valores</span>
+tipo[] nombre = {valor1, valor2, valor3};
+<span class="cm">// Crear un array vacío de 5 lugares</span>
+tipo[] nombre = <span class="kwc">new</span> tipo[5];
+
+nombre[0]                     <span class="cm">// primer elemento (se empieza a contar en 0)</span>
+nombre.length                 <span class="cm">// cantidad de elementos</span>
+nombre[nombre.length - 1]     <span class="cm">// último elemento</span>
+
+<span class="cm">// Recorrer el array con for</span>
+<span class="kwc">for</span> (<span class="kwc">int</span> i = 0; i &lt; nombre.length; i++) {
+    System.out.println(nombre[i]);
+}`,
+  checks:[["Array String[]",/String\s*\[\s*\]\s*\w+\s*=/],["Dos arrays",/String\s*\[\s*\]\s*\w+\s*=[\s\S]*String\s*\[\s*\]\s*\w+\s*=/],["for",/\bfor\s*\(/],[".length",/\.length\b/],["Índice [i]",/\[\s*i\s*\]/],["println",/System\.out\.print/]]}
+];
+const GLOBAL_CLASS=/public\s+class\s+\w+/;
+
+/* ---------- ESTADO ---------- */
+const KEY="eval-prog1-v1";
+let st={vf:Array(6).fill(null),match:Array(4).fill(""),cls:Array(8).fill(null),blank:Array(5).fill(""),
+  ord:ORD_START.slice(),ordTouched:false,code:{p1:"",p2:"",p3:""},out:{p1:"",p2:"",p3:""},
+  nombre:"",grupo:"",dificil:"",animo:"",comentario:"",start:Date.now(),end:null,sent:false};
+try{const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.vf) st=Object.assign(st,s);}catch(e){}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}},250)}
+
+/* ---------- RENDER TEORÍA ---------- */
+function renderVF(){
+  $("#vf").innerHTML=VF.map((q,i)=>`<div class="vf-row" id="vf-${i}"><p><b>${i+1}.</b> ${esc(q.t)}</p>
+   <div class="vf-btns"><button type="button" class="opt" data-vf="${i}" data-v="true" aria-label="Verdadero">V</button><button type="button" class="opt" data-vf="${i}" data-v="false" aria-label="Falso">F</button></div></div>`).join("");
+}
+function renderMatch(){
+  $("#legend").innerHTML=LEG.map(l=>`<li><b>${l.k}</b><span>${esc(l.d)}</span></li>`).join("");
+  $("#match").innerHTML=MATCH.map((m,i)=>`<div class="match-row"><span class="kw">${esc(m.w)}</span>
+   <select id="match-${i}" data-match="${i}" aria-label="Descripción para ${esc(m.w)}"><option value="">Elegí la letra…</option>${LEG.map(l=>`<option value="${l.k}">${l.k} · ${esc(l.d)}</option>`).join("")}</select></div>`).join("");
+}
+function renderCls(){
+  $("#cls").innerHTML=CLS.map((c,i)=>`<div class="cls-row" id="cls-${i}"><span class="val">${esc(c.v)}</span>
+   <div class="seg">${CATS.map(k=>`<button type="button" class="opt" data-cls="${i}" data-v="${k}">${k}</button>`).join("")}</div></div>`).join("");
+}
+function renderComp(){
+  $("#comp").innerHTML=COMP_TPL.replace(/\[\[(\d)\]\]/g,(_,n)=>{const b=BLANKS[n];
+    return `<select class="blank" id="blank-${n}" data-blank="${n}" aria-label="Espacio ${+n+1}"><option value="">  ?  </option>${b.o.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select>`;});
+}
+function renderOrder(flashIdx){
+  $("#order").innerHTML=st.ord.map((li,pos)=>`<li id="ord-${pos}" class="${pos===flashIdx?"flash":""}"><span class="n">${pos+1}</span><code>${esc(ORD[li])}</code>
+   <span style="display:flex;gap:4px"><button type="button" class="mv" data-up="${pos}" aria-label="Subir línea">▲</button><button type="button" class="mv" data-down="${pos}" aria-label="Bajar línea">▼</button></span></li>`).join("");
+}
+function renderPractice(){
+  $("#practice").innerHTML=PRACT.map(p=>`<article class="level" id="lv-${p.id}">
+   <div class="lv-top"><span class="lv-badge">${p.lv}</span><h3>${p.title}</h3><span class="lv-pts">${fmt(p.pts).replace(",00","")} pts</span></div>
+   <p class="story">${p.story}</p>
+   <ol class="task">${p.task.map(t=>`<li>${t}</li>`).join("")}</ol>
+   ${p.extra?`<p class="extra">${p.extra}</p>`:""}
+   <details class="syntax"><summary>Ver sintaxis de ayuda</summary><pre class="codebox">${p.syntax}</pre></details>
+   <div class="field"><label for="code-${p.id}">Tu código (pegalo desde GDB online)</label>
+    <textarea class="code-in" id="code-${p.id}" data-code="${p.id}" spellcheck="false" placeholder="public class Main {&#10;    public static void main(String[] args) {&#10;        // tu código acá&#10;    }&#10;}"></textarea></div>
+   <ul class="checks" id="chk-${p.id}">${p.checks.map(c=>`<li>${esc(c[0])}</li>`).join("")}</ul>
+   <div class="field"><label for="out-${p.id}">Lo que mostró la consola (opcional)</label>
+    <textarea class="out-in" id="out-${p.id}" data-out="${p.id}" spellcheck="false" placeholder="Pegá acá la salida del programa"></textarea></div>
+  </article>`).join("");
+}
+
+/* ---------- SINCRONIZAR UI ---------- */
+function paint(){
+  VF.forEach((_,i)=>document.querySelectorAll(`[data-vf="${i}"]`).forEach(b=>b.classList.toggle("on",String(st.vf[i])===b.dataset.v)));
+  MATCH.forEach((_,i)=>{$("#match-"+i).value=st.match[i]});
+  CLS.forEach((_,i)=>document.querySelectorAll(`[data-cls="${i}"]`).forEach(b=>b.classList.toggle("on",st.cls[i]===b.dataset.v)));
+  BLANKS.forEach((_,i)=>{$("#blank-"+i).value=st.blank[i]});
+  PRACT.forEach(p=>{$("#code-"+p.id).value=st.code[p.id];$("#out-"+p.id).value=st.out[p.id];checks(p)});
+  ["nombre","grupo","dificil","animo","comentario"].forEach(k=>{$("#"+k).value=st[k]});
+  xp();
+}
+function checks(p){
+  const code=st.code[p.id]||"";
+  $("#chk-"+p.id).querySelectorAll("li").forEach((li,i)=>li.classList.toggle("yes",p.checks[i][1].test(code)));
+}
+function progress(){
+  let n=0;
+  n+=st.vf.filter(v=>v!==null).length;
+  n+=st.match.filter(Boolean).length;
+  n+=st.cls.filter(Boolean).length;
+  n+=st.blank.filter(Boolean).length;
+  n+=st.ordTouched?1:0;
+  n+=PRACT.filter(p=>st.code[p.id].trim()).length;
+  return n;
+}
+const TOTAL=6+4+8+5+1+3;
+function xp(){const n=progress();$("#xpbar").style.width=(n/TOTAL*100)+"%";$("#xpnum").textContent=n+"/"+TOTAL}
+
+/* ---------- EVENTOS ---------- */
+const app=$("#app");
+app.addEventListener("click",e=>{
+  if(st.sent) return;
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.vf!==undefined){st.vf[+b.dataset.vf]=b.dataset.v==="true";}
+  else if(b.dataset.cls!==undefined){st.cls[+b.dataset.cls]=b.dataset.v;}
+  else if(b.dataset.up!==undefined||b.dataset.down!==undefined){
+    const pos=+(b.dataset.up??b.dataset.down), to=b.dataset.up!==undefined?pos-1:pos+1;
+    if(to<0||to>=st.ord.length) return;
+    [st.ord[pos],st.ord[to]]=[st.ord[to],st.ord[pos]]; st.ordTouched=true; renderOrder(to);
+  } else return;
+  paint(); save();
+});
+app.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.match!==undefined) st.match[+t.dataset.match]=t.value;
+  else if(t.dataset.blank!==undefined) st.blank[+t.dataset.blank]=t.value;
+  else if(t.id==="dificil"||t.id==="animo") st[t.id]=t.value;
+  else return;
+  xp(); save();
+});
+app.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.dataset.code){st.code[t.dataset.code]=t.value;checks(PRACT.find(p=>p.id===t.dataset.code));xp();}
+  else if(t.dataset.out){st.out[t.dataset.out]=t.value;}
+  else if(["nombre","grupo","comentario"].includes(t.id)){st[t.id]=t.value;}
+  else return;
+  save();
+});
+app.addEventListener("keydown",e=>{
+  const t=e.target;
+  if(e.key==="Tab"&&t.classList&&t.classList.contains("code-in")&&!e.shiftKey){
+    e.preventDefault(); const s=t.selectionStart,en=t.selectionEnd;
+    t.value=t.value.slice(0,s)+"    "+t.value.slice(en); t.selectionStart=t.selectionEnd=s+4;
+    t.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+});
+
+/* ---------- RELOJ ---------- */
+function mmss(ms){const s=Math.max(0,Math.floor(ms/1000));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return (h?h+":":"")+String(m).padStart(2,"0")+":"+String(x).padStart(2,"0");}
+setInterval(()=>{$("#clock").textContent=mmss((st.end||Date.now())-st.start)},1000);
+
+/* ---------- CORRECCIÓN ---------- */
+function grade(){
+  const vf=VF.map((q,i)=>st.vf[i]===q.a);
+  const mt=MATCH.map((m,i)=>st.match[i]===m.a);
+  const cl=CLS.map((c,i)=>st.cls[i]===c.a);
+  const bl=BLANKS.map((b,i)=>st.blank[i]===b.a);
+  const od=st.ord.map((li,pos)=>li===pos);
+  const c=a=>a.filter(Boolean).length;
+  const t1=c(vf)*0.25, t2=c(mt)*0.25+c(cl)*0.0625, t3=c(bl)*0.2+c(od)*(1/6);
+  return {vf,mt,cl,bl,od,t1,t2,t3,total:Math.round((t1+t2+t3)*100)/100};
+}
+function showCorrections(){
+  const g=grade();
+  document.body.classList.add("locked");
+  document.querySelectorAll("input,textarea,select").forEach(el=>{el.readOnly=true; if(el.tagName==="SELECT") el.disabled=true;});
+  VF.forEach((q,i)=>{const r=$("#vf-"+i);r.classList.add(g.vf[i]?"ok":"bad");
+    if(!g.vf[i]&&!r.querySelector(".fix")) r.querySelector("p").insertAdjacentHTML("beforeend",`<span class="fix">Era ${q.a?"verdadero":"falso"}.${q.why?" "+esc(q.why):""}</span>`)});
+  MATCH.forEach((m,i)=>$("#match-"+i).classList.add(g.mt[i]?"ok":"bad"));
+  CLS.forEach((c,i)=>{const r=$("#cls-"+i);r.classList.add(g.cl[i]?"ok":"bad");
+    if(!g.cl[i]&&!r.querySelector(".fix")) r.querySelector(".seg").insertAdjacentHTML("beforeend",`<span class="fix">Era ${c.a}</span>`)});
+  BLANKS.forEach((b,i)=>$("#blank-"+i).classList.add(g.bl[i]?"ok":"bad"));
+  st.ord.forEach((li,pos)=>$("#ord-"+pos).classList.add(g.od[pos]?"ok":"bad"));
+  $("#send").disabled=true; $("#send").textContent="Evaluación terminada";
+  return g;
+}
+
+/* ---------- ENVÍO ---------- */
+function missing(){
+  const m=[];
+  const th=TOTAL-3-(progress()-PRACT.filter(p=>st.code[p.id].trim()).length);
+  if(th>0) m.push(th+" respuesta"+(th>1?"s":"")+" de teoría sin contestar");
+  PRACT.forEach((p,i)=>{if(!st.code[p.id].trim()) m.push("el Nivel "+(i+4)+" no tiene código")});
+  return m;
+}
+$("#send").addEventListener("click",()=>{
+  if(st.sent) return;
+  if(!st.nombre.trim()||!st.grupo.trim()){toast("Completá tu nombre y grupo arriba de todo");$("#"+(!st.nombre.trim()?"nombre":"grupo")).focus();window.scrollTo({top:0,behavior:"smooth"});return;}
+  const m=missing();
+  $("#c-msg").textContent=m.length?"Ojo: "+m.join(", ")+". Después de descargar ya no vas a poder cambiar las respuestas.":"Contestaste todo. Después de descargar ya no vas a poder cambiar las respuestas.";
+  $("#confirm").hidden=false; $("#c-yes").focus();
+});
+$("#c-no").addEventListener("click",()=>{$("#confirm").hidden=true});
+$("#c-yes").addEventListener("click",()=>{
+  $("#confirm").hidden=true; st.sent=true; st.end=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}
+  finish(true);
+});
+function finish(animate){
+  const g=showCorrections();
+  const br=[["Nivel 1 · V o F",g.t1,1.5],["Nivel 2 · Uní y clasificá",g.t2,1.5],["Nivel 3 · Completá y ordená",g.t3,2]];
+  $("#r-break").innerHTML=br.map(b=>`<li><span>${b[0]}</span><span>${fmt(b[1])} / ${fmt(b[2])}</span></li>`).join("");
+  $("#result").hidden=false;
+  const el=$("#r-score");
+  if(animate&&!matchMedia("(prefers-reduced-motion: reduce)").matches){
+    const t0=performance.now();
+    (function step(t){const k=Math.min(1,(t-t0)/1200);el.textContent=fmt(g.total*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(step)})(t0);
+  } else el.textContent=fmt(g.total);
+  if(animate) downloadPdf();
+}
+$("#r-close").addEventListener("click",()=>{$("#result").hidden=true});
+$("#r-pdf").addEventListener("click",downloadPdf);
+$("#r-reset").addEventListener("click",()=>{$("#reset-confirm").hidden=false});
+$("#rs-no").addEventListener("click",()=>{$("#reset-confirm").hidden=true});
+$("#rs-yes").addEventListener("click",()=>{try{localStorage.removeItem(KEY)}catch(e){} location.reload()});
+
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true},3500)}
+
+/* ---------- PDF ---------- */
+const dlPromise=(window.claude&&typeof window.claude.use==="function")?window.claude.use("downloads").catch(()=>null):Promise.resolve(null);
+function clean(s){
+  return String(s??"").replace(/\t/g,"    ").replace(/\r/g,"")
+   .replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[–—]/g,"-").replace(/…/g,"...")
+   .replace(/≥/g,">=").replace(/≤/g,"<=").replace(/≠/g,"!=").replace(/→/g,"->")
+   .replace(/[^\n\x20-\x7E\xA0-\xFF]/g,"?");
+}
+function fileName(){
+  const n=(st.nombre||"estudiante").trim().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w]+/g,"_").replace(/^_|_$/g,"");
+  return "Evaluacion_Prog1_"+n+".pdf";
+}
+function buildPdf(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:"mm",format:"a4"});
+  const W=210,M=16,CW=W-2*M,BOTTOM=280;
+  const INK=[24,12,32],PINK=[214,20,170],MUTED=[110,96,122],OK=[40,140,40],BAD=[200,30,70];
+  let y=0;
+  const ensure=h=>{if(y+h>BOTTOM){doc.addPage();y=20;}};
+  function text(s,{size=10,style="normal",color=INK,font="helvetica",x=M,w=CW,gap=0}={}){
+    doc.setFont(font,style);doc.setFontSize(size);doc.setTextColor(...color);
+    const lh=size*0.43;
+    doc.splitTextToSize(clean(s),w).forEach(l=>{ensure(lh);doc.text(l,x,y);y+=lh;});
+    y+=gap;
+  }
+  function heading(s,pts){
+    ensure(16);y+=4;
+    doc.setFillColor(...PINK);doc.rect(M,y-4.6,2.4,6,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(13);doc.setTextColor(...INK);doc.text(clean(s),M+5,y);
+    if(pts){doc.setFont("helvetica","normal");doc.setFontSize(10);doc.setTextColor(...MUTED);doc.text(clean(pts),W-M,y,{align:"right"});}
+    y+=7;
+  }
+  function itemLine(label,answer,right,ok){
+    doc.setFont("helvetica","normal");doc.setFontSize(9.5);
+    const lines=doc.splitTextToSize(clean(label),CW-34);
+    const h=lines.length*4.1+4.4;
+    ensure(h+1);
+    doc.setTextColor(...INK);lines.forEach((l,i)=>doc.text(l,M,y+i*4.1));
+    doc.setFont("helvetica","bold");doc.setTextColor(...(ok?OK:BAD));doc.text(ok?"CORRECTA":"INCORRECTA",W-M,y,{align:"right"});
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...MUTED);
+    doc.text(clean("Respondió: "+answer+(ok?"":"   |   Correcta: "+right)),M,y+lines.length*4.1);
+    y+=h;
+  }
+  const g=grade();
+  const fdate=d=>new Date(d).toLocaleDateString("es-UY",{day:"2-digit",month:"2-digit",year:"numeric"});
+  const ftime=d=>new Date(d).toLocaleTimeString("es-UY",{hour:"2-digit",minute:"2-digit"});
+  const end=st.end||Date.now();
+
+  // Cabezal
+  doc.setFillColor(14,6,22);doc.rect(0,0,W,34,"F");
+  doc.setFillColor(...PINK);doc.rect(0,34,W,1.4,"F");
+  doc.setFont("helvetica","bold");doc.setFontSize(20);doc.setTextColor(255,60,220);doc.text("EVALUACION II - PROGRAMACION I",M,16);
+  doc.setFont("helvetica","normal");doc.setFontSize(10);doc.setTextColor(200,240,255);
+  doc.text(clean("Variables · if / else · while · arrays · for   |   Java"),M,24);
+  doc.text(clean("Reporte generado el "+fdate(end)+" a las "+ftime(end)),M,29.5);
+  y=46;
+
+  // Datos
+  const info=[["Estudiante",st.nombre],["Grupo",st.grupo],["Fecha",fdate(end)],["Hora de inicio",ftime(st.start)],["Hora de envío",ftime(end)],["Tiempo empleado",mmss(end-st.start)]];
+  info.forEach(([k,v],i)=>{const col=i%2,x=M+col*(CW/2);
+    doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(...MUTED);doc.text(clean(k.toUpperCase()),x,y);
+    doc.setFont("helvetica","normal");doc.setFontSize(11);doc.setTextColor(...INK);doc.text(clean(v||"-"),x,y+5);
+    if(col===1) y+=12;});
+  y+=2;
+
+  // Puntajes
+  ensure(30);
+  const bw=(CW-8)/3,labels=[["TEÓRICO (automático)",fmt(g.total)+" / 5"],["PRÁCTICO (docente)","____ / 5"],["NOTA FINAL","____ / 10"]];
+  labels.forEach(([k,v],i)=>{const x=M+i*(bw+4);
+    doc.setDrawColor(...(i===0?PINK:[180,170,190]));doc.setLineWidth(i===0?0.8:0.3);doc.roundedRect(x,y,bw,22,2,2,"S");
+    doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.setTextColor(...MUTED);doc.text(clean(k),x+4,y+6);
+    doc.setFontSize(15);doc.setTextColor(...(i===0?PINK:INK));doc.text(clean(v),x+4,y+16);});
+  y+=30;
+
+  // Resumen práctico
+  heading("Resumen");
+  text("Nivel 1 - Verdadero o falso: "+fmt(g.t1)+" / 1,50     Nivel 2 - Uní y clasificá: "+fmt(g.t2)+" / 1,50     Nivel 3 - Completá y ordená: "+fmt(g.t3)+" / 2,00",{size:9.5});
+  PRACT.forEach((p,i)=>{const code=st.code[p.id];const ok=p.checks.filter(c=>c[1].test(code)).length;
+    text("Nivel "+(i+4)+" - "+p.title+": "+(code.trim()?code.split("\n").length+" líneas de código, "+ok+"/"+p.checks.length+" elementos pedidos detectados":"sin código entregado"),{size:9.5});});
+  if(st.dificil||st.animo) text("Autoevaluación: "+(st.animo||"-")+". Nivel que más le costó: "+(st.dificil||"-")+".",{size:9.5});
+  if(st.comentario.trim()) text("Comentario del estudiante: "+st.comentario.trim(),{size:9.5,style:"italic"});
+
+  // Teoría detalle
+  heading("Nivel 1 · Verdadero o falso",fmt(g.t1)+" / 1,50");
+  VF.forEach((q,i)=>itemLine((i+1)+". "+q.t,st.vf[i]===null?"(sin responder)":(st.vf[i]?"V":"F"),q.a?"V":"F",g.vf[i]));
+  heading("Nivel 2 · Uní y clasificá",fmt(g.t2)+" / 1,50");
+  text("A. Unir estructura con descripción",{size:9,style:"bold",color:MUTED,gap:1.5});
+  const L=k=>{const l=LEG.find(x=>x.k===k);return l?k+") "+l.d:"(sin responder)"};
+  MATCH.forEach((m,i)=>itemLine(m.w,L(st.match[i]),L(m.a),g.mt[i]));
+  text("B. Clasificar valores por tipo de dato",{size:9,style:"bold",color:MUTED,gap:1.5});
+  CLS.forEach((c,i)=>itemLine("Valor "+c.v,st.cls[i]||"(sin responder)",c.a,g.cl[i]));
+  heading("Nivel 3 · Completá y ordená",fmt(g.t3)+" / 2,00");
+  text("A. Completar el código",{size:9,style:"bold",color:MUTED,gap:1.5});
+  BLANKS.forEach((b,i)=>itemLine("Espacio "+(i+1),st.blank[i]||"(sin responder)",b.a,g.bl[i]));
+  text("B. Orden de líneas entregado ("+g.od.filter(Boolean).length+"/6 en su lugar)",{size:9,style:"bold",color:MUTED,gap:1.5});
+  st.ord.forEach((li,pos)=>{ensure(5);doc.setFont("courier","normal");doc.setFontSize(9);doc.setTextColor(...(g.od[pos]?OK:BAD));
+    doc.text(clean((pos+1)+"  "+ORD[li]),M,y);y+=4.4;});
+
+  // Práctica
+  PRACT.forEach((p,i)=>{
+    doc.addPage();y=20;
+    heading("Nivel "+(i+4)+" · "+p.title,"____ / "+fmt(p.pts));
+    const plain=s=>s.replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">");
+    text(plain(p.story),{size:9,color:MUTED,gap:1});
+    p.task.forEach((t,k)=>text((k+1)+". "+plain(t),{size:9,color:MUTED}));
+    if(p.extra) text(plain(p.extra),{size:9,color:MUTED});
+    y+=2;
+    const code=st.code[p.id];
+    const flags=p.checks.map(c=>(c[1].test(code)?"[x] ":"[ ] ")+c[0]).join("    ");
+    text("Elementos detectados automáticamente (orientativo): "+flags+"    "+(GLOBAL_CLASS.test(code)?"[x] clase completa":"[ ] clase completa"),{size:8.5,color:INK,gap:2});
+    text("CÓDIGO DEL ESTUDIANTE",{size:8,style:"bold",color:PINK,gap:1});
+    if(!code.trim()){text("(No entregó código)",{size:10,style:"italic",color:BAD});}
+    else{
+      doc.setFont("courier","normal");doc.setFontSize(8.6);
+      const lines=clean(code).split("\n");
+      lines.forEach((ln,k)=>{
+        const parts=doc.splitTextToSize(ln===""?" ":ln,CW-12);
+        parts.forEach((pt,j)=>{ensure(4);
+          doc.setFillColor(246,242,249);doc.rect(M,y-3.1,CW,4,"F");
+          doc.setTextColor(...MUTED);doc.text(j===0?String(k+1).padStart(3," "):"   ",M+1,y);
+          doc.setTextColor(...INK);doc.text(pt,M+11,y);y+=4;});
+      });
+      y+=2;
+    }
+    if(st.out[p.id].trim()){
+      text("SALIDA DE CONSOLA (pegada por el estudiante)",{size:8,style:"bold",color:PINK,gap:1});
+      text(st.out[p.id],{size:8.6,font:"courier",gap:2});
+    }
+    ensure(26);y+=4;
+    doc.setDrawColor(180,170,190);doc.setLineWidth(0.3);
+    doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...INK);
+    doc.text(clean("Puntaje docente: ______ / "+fmt(p.pts)),M,y);y+=7;
+    doc.setFont("helvetica","normal");doc.text("Observaciones:",M,y);
+    for(let k=0;k<2;k++){doc.line(M+26,y+k*7,W-M,y+k*7);} y+=14;
+  });
+
+  // Pie
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);
+    doc.setDrawColor(...PINK);doc.setLineWidth(0.4);doc.line(M,287,W-M,287);
+    doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...INK);doc.text("Prof. Bruno Silva · Programación I".replace("·","-"),M,292);
+    doc.setFont("helvetica","normal");doc.setTextColor(...MUTED);
+    doc.text(clean(st.nombre||""),W/2,292,{align:"center"});
+    doc.text("Página "+i+" de "+n,W-M,292,{align:"right"});}
+  return doc;
+}
+async function downloadPdf(){
+  if(!window.jspdf){toast("No se pudo cargar el generador de PDF. Revisá la conexión y recargá.");return;}
+  let doc; try{doc=buildPdf();}catch(e){console.error(e);toast("Error al armar el PDF");return;}
+  const name=fileName();
+  const dl=await dlPromise;
+  if(dl){
+    try{await dl.save({filename:name,data:doc.output("blob")});toast("PDF guardado. Ahora subilo a CREA");return;}
+    catch(e){if(e&&e.code==="declined"){toast("Descarga cancelada. Podés volver a intentarlo.");return;}
+      if(e&&e.code==="rate_limited"){toast("Ya hay una descarga abierta");return;}}
+  }
+  try{doc.save(name);toast("PDF descargado: "+name+". Ahora subilo a CREA");}catch(e){toast("Este navegador no permitió la descarga");}
+}
+
+/* ---------- INICIO ---------- */
+renderVF();renderMatch();renderCls();renderComp();renderOrder();renderPractice();paint();
+if(st.sent) finish(false);
+})();
+</script>
+
+</body>
+</html>
